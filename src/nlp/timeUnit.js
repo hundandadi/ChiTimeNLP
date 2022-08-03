@@ -36,6 +36,7 @@ var TimeUnit = function () {
         this._tpOrigin = new TimePoint(this.timeBase);
         this.isFirstTimeSolveContext = true;
         this.isAllDayTime = true;
+        this.isPM = false;
     }
 
     /**
@@ -51,13 +52,17 @@ var TimeUnit = function () {
                     this._tp.tunit[i] = this._tpOrigin.tunit[i];
                 }
             }
-            /** 在处理小时这个级别时，如果上文时间是下午的且下文没有主动声明小时级别以上的时间，则也把下文时间设为下午 */
-            if (this.isFirstTimeSolveContext && checkTimeIndex === 3 && this._tpOrigin.tunit[3] >= 12 && this._tp.tunit[3] < 12) {
+            /** 
+             * 在处理小时这个级别时，如果上文时间是下午的且下文没有主动声明小时级别以上的时间，则也把下文时间设为下午 
+             * 如果时间+12后小于当前小时, 认为是第二天上午的时间
+            */
+            if (this.isFirstTimeSolveContext && checkTimeIndex === 3 && this._tpOrigin.tunit[3] >= 12 && this._tp.tunit[3] < 12 && this._tp.tunit[3] +12 >= this._tpOrigin.tunit[3]) {
                 this._tp.tunit[3] += 12;
+                this.isPM = true;
             }
-            if (checkTimeIndex === 3 && this._tpOrigin.tunit[3] > this._tp.tunit[3]) {
-                this._tp.tunit[3] += 12;
-            }
+            // if (checkTimeIndex === 3 && this._tpOrigin.tunit[3] > this._tp.tunit[3]) {
+            //     this._tp.tunit[3] += 12;
+            // }
             this.isFirstTimeSolveContext = false;
         }
 
@@ -73,9 +78,12 @@ var TimeUnit = function () {
     }, {
         key: '_preferFuture',
         value: function _preferFuture(checkTimeIndex) {
-            /** 1. 检查被检查的时间级别之前，是否没有更高级的已经确定的时间，如果有，则不进行处理. */
+            /** 
+             * 1. 检查被检查的时间级别之前，是否没有更高级的已经确定的时间.
+             * 2. 未来时间大于当前时间, 则不进行处理.
+             * */
             for (var i = 0; i < checkTimeIndex; i++) {
-                if (this._tp.tunit[i] !== -1) return;
+                if (this._tp.tunit[i] !== -1 && this._tp.tunit[i] > this._tpOrigin.tunit[i]) return;
             }
             /** 2. 根据上下文补充时间 */
             this._checkContextTime(checkTimeIndex);
@@ -91,17 +99,26 @@ var TimeUnit = function () {
             var d = this.timeBase;
             var tp = new TimePoint(d);
 
-            if (tp.tunit[checkTimeIndex] < this._tp.tunit[checkTimeIndex]) {
+            if (tp.tunit[checkTimeIndex] <= this._tp.tunit[checkTimeIndex]) {
                 return;
             }
-            // 准备增加的时间单位是被检查的时间的上一级，将上一级时间+1
-            tp.tunit[checkTimeIndex - 1] += 1;
+            /** 
+             * 准备增加的时间单位是被检查的时间的上一级，将上一级时间+1
+             * 分钟或者秒数小于当前, 说明需要进行日期加一
+             * 本来不确定下午时间, 处理成下午后需要还原
+             * */ 
+            if(checkTimeIndex > 3)
+                tp.tunit[2] += 1;
+                if(this.isPM && tp.tunit[3]>12)
+                    tp.tunit[3] -= 12;
+            else
+                tp.tunit[checkTimeIndex - 1] += 1;
 
             for (var _i = 0; _i < checkTimeIndex; _i++) {
                 this._tp.tunit[_i] = tp.tunit[_i];
-                if (_i === 1) {
-                    this._tp.tunit[_i] += 1;
-                }
+                // if (_i === 1) {
+                //     this._tp.tunit[_i] += 1;
+                // }
             }
         }
 

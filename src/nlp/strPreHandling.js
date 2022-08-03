@@ -59,6 +59,9 @@ var handler = {
                         rtn += section;
                         section = 0;
                     } else {
+                        if(number == 0){
+                            number = 1;
+                        }
                         section += number * unit;
                     }
                     number = 0;
